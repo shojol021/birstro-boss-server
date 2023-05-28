@@ -31,17 +31,28 @@ async function run() {
     const reviewsCollection = client.db('BistroDb').collection('reviews')
     const cartCollection = client.db('BistroDb').collection('cart')
 
-    app.get('/menu', async(req, res) => {
-        const result = await menuCollection.find().toArray()
-        res.send(result)
+    app.get('/menu', async (req, res) => {
+      const result = await menuCollection.find().toArray()
+      res.send(result)
     })
 
-    app.get('/reviews', async(req, res) => {
-        const result = await reviewsCollection.find().toArray()
-        res.send(result)
+    app.get('/reviews', async (req, res) => {
+      const result = await reviewsCollection.find().toArray()
+      res.send(result)
     })
 
-    app.post('/cart', async(req, res) => {
+
+    app.get('/cart', async (req, res) => {
+      const email = req.query.email;
+      if (!email) {
+        res.send([])
+      }
+      const query = { email: email }
+      const result = await cartCollection.find(query).toArray()
+      res.send(result)
+    })
+
+    app.post('/cart', async (req, res) => {
       const item = req.body;
       const result = await cartCollection.insertOne(item)
       res.send(result)
@@ -60,7 +71,7 @@ run().catch(console.dir);
 
 
 app.get('/', (req, res) => {
-    res.send('Bistro Boss Running')
+  res.send('Bistro Boss Running')
 }),
 
-app.listen(port)
+  app.listen(port)
