@@ -27,6 +27,7 @@ async function run() {
     await client.connect();
 
 
+    const userCollection = client.db('BistroDb').collection('user')
     const menuCollection = client.db('BistroDb').collection('menu')
     const reviewsCollection = client.db('BistroDb').collection('reviews')
     const cartCollection = client.db('BistroDb').collection('cart')
@@ -65,6 +66,11 @@ async function run() {
       res.send(result)
     })
 
+    app.post('/users', async(req, res) => {
+      const userInfo = req.body;
+      const result = await userCollection.insertOne(userInfo)
+      res.send(result)
+    })
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
