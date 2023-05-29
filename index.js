@@ -9,7 +9,21 @@ require('dotenv').config();
 app.use(cors())
 app.use(express.json())
 
+const verifyJwt = (req, res, next) => {
+  const authorization = req.headers.authorization;
+  if (!authorization) {
+    return res.status(401).send({ error: true, message: 'unauthorized access' })
+  }
 
+  const token = authorization.split(' ')[1]
+  jwt.verify(token, process.env.ACCESS_TOKEN, (error, decoded) => {
+    if (error) {
+      return res.status(401).send({ error: true, message: 'unauthorized access' })
+    }
+    req.decoded = decoded;
+    next()
+  })
+}
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.6c8obk5.mongodb.net/?retryWrites=true&w=majority`;
 
@@ -32,6 +46,12 @@ async function run() {
     const menuCollection = client.db('BistroDb').collection('menu')
     const reviewsCollection = client.db('BistroDb').collection('reviews')
     const cartCollection = client.db('BistroDb').collection('cart')
+
+    app.post('/jwt', (req, res) => {
+      const user = req.body;
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN, { expiresIn: '1h' })
+      res.send({ token })
+    })
 
     app.get('/menu', async (req, res) => {
       const result = await menuCollection.find().toArray()
@@ -60,35 +80,35 @@ async function run() {
       res.send(result)
     })
 
-    app.delete('/cart/:id', async(req, res) => {
+    app.delete('/cart/:id', async (req, res) => {
       const id = req.params.id;
-      const query = {_id: new ObjectId(id)}
+      const query = { _id: new ObjectId(id) }
       const result = await cartCollection.deleteOne(query)
       res.send(result)
     })
 
     //users......................
 
-    app.get('/users', async(req,res) => {
+    app.get('/users', async (req, res) => {
       const result = await userCollection.find().toArray()
       res.send(result)
     })
 
-    app.post('/users', async(req, res) => {
+    app.post('/users', async (req, res) => {
       const userInfo = req.body;
-      const query =  {email: userInfo.email}
+      const query = { email: userInfo.email }
       const existingUser = await userCollection.findOne(query)
-      if(existingUser){
-        
-        return res.send({message: 'User Already exist'})
+      if (existingUser) {
+
+        return res.send({ message: 'User Already exist' })
       }
       const result = await userCollection.insertOne(userInfo)
       res.send(result)
     })
 
-    app.patch('/users/admin/:id', async(req, res) => {
+    app.patch('/users/admin/:id', async (req, res) => {
       const id = req.params.id;
-      const filter = {_id: new ObjectId(id)}
+      const filter = { _id: new ObjectId(id) }
       const updatedDoc = {
         $set: {
           role: "admin"
