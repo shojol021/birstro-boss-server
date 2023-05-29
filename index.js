@@ -2,6 +2,7 @@ const express = require("express")
 const app = express()
 const cors = require('cors')
 const port = process.env.PORT || 5000
+const jwt = require('jsonwebtoken')
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 require('dotenv').config();
 
@@ -66,9 +67,34 @@ async function run() {
       res.send(result)
     })
 
+    //users......................
+
+    app.get('/users', async(req,res) => {
+      const result = await userCollection.find().toArray()
+      res.send(result)
+    })
+
     app.post('/users', async(req, res) => {
       const userInfo = req.body;
+      const query =  {email: userInfo.email}
+      const existingUser = await userCollection.findOne(query)
+      if(existingUser){
+        
+        return res.send({message: 'User Already exist'})
+      }
       const result = await userCollection.insertOne(userInfo)
+      res.send(result)
+    })
+
+    app.patch('/users/admin/:id', async(req, res) => {
+      const id = req.params.id;
+      const filter = {_id: new ObjectId(id)}
+      const updatedDoc = {
+        $set: {
+          role: "admin"
+        }
+      }
+      const result = await userCollection.updateOne(filter, updatedDoc)
       res.send(result)
     })
 
