@@ -16,6 +16,7 @@ const verifyJwt = (req, res, next) => {
   }
 
   const token = authorization.split(' ')[1]
+
   jwt.verify(token, process.env.ACCESS_TOKEN, (error, decoded) => {
     if (error) {
       return res.status(401).send({ error: true, message: 'unauthorized access' })
@@ -53,6 +54,16 @@ async function run() {
       res.send({ token })
     })
 
+    const verifyAdmin = async(req, res, next) => {
+      const email = req.decoded.email;
+      const query = {email: email}
+      const user = await userCollection.findOne(query)
+      if(user?.role !== 'admin'){
+        res.status(403).send({error: true, message: 'forbidden'})
+      }
+      next()
+    }
+
     app.get('/menu', async (req, res) => {
       const result = await menuCollection.find().toArray()
       res.send(result)
@@ -64,10 +75,15 @@ async function run() {
     })
 
 
-    app.get('/cart', async (req, res) => {
+    app.get('/cart', verifyJwt, async (req, res) => {
       const email = req.query.email;
       if (!email) {
         res.send([])
+      }
+
+      const decodedEmail = req.decoded.email;
+      if(decodedEmail !== email){
+        return res.status(401).send({ error: true, message: 'unauthorized access' })
       }
       const query = { email: email }
       const result = await cartCollection.find(query).toArray()
@@ -89,7 +105,7 @@ async function run() {
 
     //users......................
 
-    app.get('/users', async (req, res) => {
+    app.get('/users', verifyJwt, verifyAdmin, async (req, res) => {
       const result = await userCollection.find().toArray()
       res.send(result)
     })
@@ -106,6 +122,8 @@ async function run() {
       res.send(result)
     })
 
+    //admin ..............................
+
     app.patch('/users/admin/:id', async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) }
@@ -115,6 +133,18 @@ async function run() {
         }
       }
       const result = await userCollection.updateOne(filter, updatedDoc)
+      res.send(result)
+    })
+
+    app.get('/users/admin/:email', verifyJwt, async(req,res) => {
+      const email = req.params.email;
+
+      if(req.decoded.email !== email){
+        return res.send({admin: false})
+      }
+      const query = {email: email}
+      const user = await userCollection.findOne(query)
+      const result = {admin: user?.role === 'admin'}
       res.send(result)
     })
 
