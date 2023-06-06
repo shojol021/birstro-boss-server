@@ -1,10 +1,11 @@
 const express = require("express")
 const app = express()
+require('dotenv').config();
 const cors = require('cors')
 const port = process.env.PORT || 5000
 const jwt = require('jsonwebtoken')
+const stripe = require("stripe")(process.env.PAYMENT_SECRET_KEY)
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
-require('dotenv').config();
 
 app.use(cors())
 app.use(express.json())
@@ -47,6 +48,7 @@ async function run() {
     const menuCollection = client.db('BistroDb').collection('menu')
     const reviewsCollection = client.db('BistroDb').collection('reviews')
     const cartCollection = client.db('BistroDb').collection('cart')
+    const paymentCollection = client.db('BistroDb').collection('payment')
 
     app.post('/jwt', (req, res) => {
       const user = req.body;
@@ -72,6 +74,13 @@ async function run() {
     app.post('/menu', verifyJwt, verifyAdmin, async (req, res) => {
       const newItem = req.body;
       const result = await menuCollection.insertOne(newItem)
+      res.send(result)
+    })
+
+    app.delete('/menu/:id', verifyJwt, verifyAdmin, async(req, res) => {
+      const id = req.params.id;
+      const query = {_id: new ObjectId(id)}
+      const result = await menuCollection.deleteOne(query)
       res.send(result)
     })
 
@@ -152,6 +161,46 @@ async function run() {
       const user = await userCollection.findOne(query)
       const result = {admin: user?.role === 'admin'}
       res.send(result)
+    })
+
+    // create payment
+    app.post('/create-payment-intent', verifyJwt, async(req, res) => {
+      const {price} = req.body;
+      const amount = Math.ceil(price*100);
+      console.log(price, amount)
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: 'usd',
+        payment_method_types: ['card']
+      })
+      res.send({
+        clientSecret: paymentIntent.client_secret
+      })
+    })
+
+    app.post('/payment', verifyJwt, async(req, res) => {
+      const payment = req.body;
+      const result = await paymentCollection.insertOne(payment)
+      
+
+      const query = {_id: {$in: payment.cartItems.map(id => new ObjectId(id))}}
+      const deleteResult = await cartCollection.deleteMany(query)
+
+      res.send({result, deleteResult})
+    })
+
+    app.get('/admin-stats', verifyJwt, verifyAdmin, async(req, res) => {
+      const user = await userCollection.estimatedDocumentCount()
+      const products = await menuCollection.estimatedDocumentCount()
+      const orders = await paymentCollection.estimatedDocumentCount()
+      const payment = await paymentCollection.find().toArray()
+      const revenue = payment.reduce((sum, item) => sum+item.price, 0)
+
+      res.send({user, products, orders, revenue})
+    })
+
+    app.get('/order-stats', (req, res) => {
+      
     })
 
     // Send a ping to confirm a successful connection
